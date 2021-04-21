@@ -23,7 +23,15 @@ const long timeoutTime = 2000;
 char daysOfTheWeek[7][12] = {"Sunday",   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 RTC_DS1307 rtc;
 
+bool first7 = false;
 bool first12 = false;
+
+bool current7 = false;
+bool current12 = false;
+
+int previousSprinklerTime = 0;
+
+bool cancel = false;
 
 String returnTime() {
   DateTime now = rtc.now();
@@ -48,25 +56,36 @@ String returnTime() {
   result += " ";
 
   return result;
-  result = "";
 }
 
 String returnHours(){
  DateTime now = rtc.now();
   int hrs = now.hour();
-  String result;
+  String result = String(hrs);
 
   return result;
 }
 
-String returnDay(){
+String returnMinute(){
   DateTime now = rtc.now();
   int hrs = now.hour();
   String result;
 
-  result += now.day(), DEC;
+  result += now.minute(), DEC;
 
   return result;
+}
+
+String returnSuffix(){
+  DateTime now = rtc.now();
+  int hrs = now.hour();
+
+  if(hrs > 12){
+    return "PM";
+  }
+  else{
+   return "AM";
+ }
 }
 
 void setup() {
@@ -76,7 +95,10 @@ void setup() {
   pinMode(output12, OUTPUT);
 
   digitalWrite(output14, LOW);
+  digitalWrite(output12, HIGH);
+  delay(50);
   digitalWrite(output12, LOW);
+  
 
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -149,6 +171,7 @@ void loop(){
               automatedState = "on";
             } else if (header.indexOf("GET /a/off") >= 0) {
               automatedState = "off";
+              cancel = true;
             }
             
             client.println("<!DOCTYPE html><html>");
@@ -164,17 +187,17 @@ void loop(){
             client.println("<hr><hr>");
             client.println();
 
-            client.println("<p>Welcome, the time this page is being accessed is roughly <b><u><i>" + returnTime() + "</b></u></i></p>");
+            if (first12 == false){
+              client.println("<p>Welcome, the time this page is being accessed is roughly <u><b><i>" + returnTime() + "</u> AM</b></i></p>");
+            }
+            else{
+              client.println("<p>Welcome, the time this page is being accessed is roughly <u><b><i>" + returnTime() + "</u> PM</b></i></p>");
+            }
+
             client.println();
 
             client.println("<p><b><u>Automated Setting</u></b> (Goes off at 7 PM)</p> <p>");
             client.println();
-
-            if(sprinkiled_today == true) 
-              client.println("<p>Sprinkled Today: <b style = \"color: green\">TRUE</b></p>");
-            else 
-              client.println("<p>Sprinkled Today: <b style = \"color: red\">FALSE</b></p>");
-            
             
             client.println();
 
@@ -189,6 +212,11 @@ void loop(){
             client.println("<p><b><u>Current Sprinkler State:</u></b></p>");
             client.println();
 
+            if(sprinkiled_today == true) 
+              client.println("<p>Sprinkled Today: <b style = \"color: green\">TRUE</b></p>");
+            else 
+              client.println("<p>Sprinkled Today: <b style = \"color: red\">FALSE</b></p>");   
+
             if (output14State == "on") {
               client.println("<p><a href=\"/12/on\"><button class=\"button\">ON</button></a></p>");
             }  
@@ -198,38 +226,17 @@ void loop(){
             } 
 
             client.println();
-            client.println("<h3 style = \"color: red\"><i><b>Comyar Dehlavi</i></b></h3>");
+            client.println("<h3 style = \"color: red\"><i><b>Comyar Dehlavi 2021</i></b></h3>");
 
             client.println("</body></html>");
             client.println();
-
+        
             break;
           } else { 
             currentLine = "";
           }
         } else if (c != '\r') {  
           currentLine += c;    
-        }
-      }
-      if(automatedState == "on"){
-        if(returnHours() == "7" && first12 == true){
-          Serial.println("GPIO 14 on");
-          output14State = "on";
-          output12State = "off";
-          sprinkiled_today = true;
-          first12 ==  false;
-
-          digitalWrite(output14, HIGH);
-          delay(200);
-          digitalWrite(output14, LOW);
-
-          delay(600000);
-
-          digitalWrite(output12, HIGH);
-          delay(500);
-          digitalWrite(output12, LOW);
-        }else{
-          first12 == true;
         }
       }
     }
@@ -241,25 +248,73 @@ void loop(){
     Serial.println("");
   }
 
-  if(automatedState == "on"){
-    if(returnHours() == "7" && first12 == true){
-        Serial.println("GPIO 14 on");
-        output14State = "on";
-        output12State = "off";
-        sprinkiled_today = true;
-        first12 ==  false;
 
-        digitalWrite(output14, HIGH);
-        delay(200);
-        digitalWrite(output14, LOW);
+  if(output14State == "on"){
+    int currentSprinklerTime = millis();
+    unsigned long long interval = 1800000;
 
-        delay(600000);
-
-        digitalWrite(output12, HIGH);
-        delay(500);
-        digitalWrite(output12, LOW);
-    }else{
-      first12 == true;
+    if(previousSprinklerTime == 0){
+      previousSprinklerTime = currentSprinklerTime;
     }
+
+    if(currentSprinklerTime - previousSprinklerTime >= interval){
+      output14State = "off";
+      output12State = "on";
+
+      digitalWrite(output12, HIGH);
+      delay(50);
+      digitalWrite(output12, LOW);
+
+      previousSprinklerTime = 0;
+    }
+  }else{
+    previousSprinklerTime = 0;
+  }
+
+  if(automatedState == "on"){
+    if(returnHours() == "7"){
+      if(current7 == false){
+        if(first7 == true){
+            Serial.println("GPIO 14 on");
+            sprinkiled_today = true;
+            first7 =  false;
+            current7 = true;
+
+            digitalWrite(output14, HIGH);
+            delay(200);
+            digitalWrite(output14, LOW);
+        }else{
+          first7 = true;
+          current7 = true;
+        }
+      } else{
+        if (returnHours() != "7"){
+          current7 = false;
+        }
+      }
+    }
+  } else if (cancel == true){
+      digitalWrite(output12, HIGH);
+      delay(500);
+      digitalWrite(output12, LOW);
+      
+      cancel = false;
+    }
+
+  if(returnHours() == "12"){
+    if(current12 == false){
+      if(first12 == false){
+        current12 = true;
+        first12 = true;
+        sprinkiled_today = false;
+      }else{
+        first12 = false;
+        current12 = true;
+      }
+    } else{
+        if(returnHours() != "12"){
+          current12 = false;
+        }
+      } 
   }
 }
