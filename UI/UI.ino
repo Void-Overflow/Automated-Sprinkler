@@ -32,6 +32,7 @@ bool current12 = false;
 int previousSprinklerTime = 0;
 
 bool cancel = false;
+bool automated = false;
 
 String returnTime() {
   DateTime now = rtc.now();
@@ -61,6 +62,17 @@ String returnTime() {
 String returnHours(){
  DateTime now = rtc.now();
   int hrs = now.hour();
+
+   if (hrs == 0 && hrs != 12) {
+    hrs = 12;
+  } else if (hrs == 12 && hrs != 0) {
+    hrs = 12;
+  } else if (hrs < 12 && hrs != 0) {
+    hrs = hrs;
+  } else if (hrs > 12 && hrs != 0) {
+    hrs = hrs - 12;
+  }
+
   String result = String(hrs);
 
   return result;
@@ -80,7 +92,7 @@ String returnSuffix(){
   DateTime now = rtc.now();
   int hrs = now.hour();
 
-  if(hrs > 12){
+  if(hrs >= 12){
     return "PM";
   }
   else{
@@ -187,12 +199,7 @@ void loop(){
             client.println("<hr><hr>");
             client.println();
 
-            if (first12 == false){
-              client.println("<p>Welcome, the time this page is being accessed is roughly <u><b><i>" + returnTime() + "</u> AM</b></i></p>");
-            }
-            else{
-              client.println("<p>Welcome, the time this page is being accessed is roughly <u><b><i>" + returnTime() + "</u> PM</b></i></p>");
-            }
+            client.println("<p>Welcome, the time this page is being accessed is roughly <u><b><i>" + returnTime() + "</u> " + returnSuffix() + "</b></i></p>");
 
             client.println();
 
@@ -249,7 +256,7 @@ void loop(){
   }
 
 
-  if(output14State == "on"){
+  if(output14State == "on" || automated == true){
     int currentSprinklerTime = millis();
     unsigned long long interval = 1800000;
 
@@ -261,6 +268,8 @@ void loop(){
       output14State = "off";
       output12State = "on";
 
+      automated = false;
+
       digitalWrite(output12, HIGH);
       delay(50);
       digitalWrite(output12, LOW);
@@ -271,50 +280,47 @@ void loop(){
     previousSprinklerTime = 0;
   }
 
-  if(automatedState == "on"){
+   if(automatedState == "on"){
     if(returnHours() == "7"){
       if(current7 == false){
-        if(first7 == true){
+        if(returnSuffix() == "PM"){
             Serial.println("GPIO 14 on");
             sprinkiled_today = true;
-            first7 =  false;
             current7 = true;
+
+            automated = true;
 
             digitalWrite(output14, HIGH);
             delay(200);
             digitalWrite(output14, LOW);
         }else{
-          first7 = true;
           current7 = true;
         }
-      } else{
-        if (returnHours() != "7"){
-          current7 = false;
-        }
-      }
+      } 
+    } else{
+      current7 = false;
     }
   } else if (cancel == true){
       digitalWrite(output12, HIGH);
       delay(500);
       digitalWrite(output12, LOW);
       
+      automated = false;
       cancel = false;
     }
 
   if(returnHours() == "12"){
     if(current12 == false){
-      if(first12 == false){
+      if(returnSuffix() == "AM"){
         current12 = true;
-        first12 = true;
         sprinkiled_today = false;
       }else{
-        first12 = false;
         current12 = true;
       }
-    } else{
-        if(returnHours() != "12"){
-          current12 = false;
-        }
-      } 
-  }
+    } 
+  }else{
+    if(returnHours() != "12"){
+      current12 = false;
+    }
+  } 
 }

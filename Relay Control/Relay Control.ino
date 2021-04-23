@@ -5,16 +5,24 @@
 #define relay_2 5
 #define relay_3 6
 
+bool state = false;
+
+bool relay_1_state = false;
+bool relay_2_state = false;
+bool relay_3_state = false;
+
+int interval = 600000;
+int previousTime = 0;
+
 void InterruptServiceRoutine_ON(){
-  for(int i = 4; i<= 6; i++){
-    digitalWrite(i, HIGH);
-  }
+  state = true;
 }
 
 void InterruptServiceRoutine_OFF(){
    for(int i = 4; i<= 6; i++){
     digitalWrite(i, LOW);
   }
+  state = false;
 }
 
 void setup() {
@@ -30,4 +38,15 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(interrupt_pin_OFF), InterruptServiceRoutine_OFF, RISING);
 }
 
-void loop() {}
+void loop() {
+  if (state == true){
+    int currentTime = millis();
+
+    if(currentTime - previousTime >= interval){
+
+      previousTime = currentTime;
+    }
+  } else{
+    previousTime = 0;
+  }
+}
