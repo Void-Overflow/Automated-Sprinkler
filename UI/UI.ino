@@ -1,8 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <RTClib.h>
 
-const char* ssid = "2WIRE347_EXT";
-const char* password = "2704414570";
+const char* ssid = "";
+const char* password = "";
 
 WiFiServer server(80);
 String header;
